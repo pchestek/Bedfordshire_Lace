@@ -713,11 +713,11 @@ class BedfordshireLace(inkex.EffectExtension):
         # In SVG coordinates (Y-down), for a typical closed path:
         # Negative cross = convex/exterior corner (turning outward)
         # Positive cross = concave/interior corner (turning inward)
-        # This is independent of overall winding direction for determining convexity
+        # Zero or near-zero = straight line or very sharp angle (treat as exterior)
 
-        # Simply check sign of cross product
-        # Negative = exterior, Positive = interior
-        return cross < 0
+        # Check sign of cross product
+        # Negative or near-zero = exterior, Positive = interior
+        return cross <= 0.1  # Small tolerance for numerical precision
 
     def calculate_vertex_pricking_position(self, prev_point, vertex, next_point, half_width, is_exterior):
         """
@@ -945,7 +945,7 @@ class BedfordshireLace(inkex.EffectExtension):
                     v1 = (curr_vertex[0] - prev_vertex[0], curr_vertex[1] - prev_vertex[1])
                     v2 = (next_vertex[0] - curr_vertex[0], next_vertex[1] - curr_vertex[1])
                     cross = v1[0] * v2[1] - v1[1] * v2[0]
-                    inkex.utils.debug(f"DEBUG:   Vertex {vertex_idx}: cross={cross:.2f}, is_exterior={is_exterior}")
+                    inkex.utils.debug(f"DEBUG:   Vertex {vertex_idx}: pos=({curr_vertex[0]:.1f},{curr_vertex[1]:.1f}), cross={cross:.2f}, is_exterior={is_exterior}")
 
                     # Determine which edge is the "outer" edge by checking which is farther from center
                     # Calculate path centroid
