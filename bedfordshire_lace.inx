@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <name>Bedfordshire Lace</name>
+    <id>org.inkscape.effect.bedfordshire_lace</id>
+
+    <param name="element_type" type="optiongroup" appearance="combo" gui-text="Element Type:">
+        <option value="tape">Tape</option>
+        <option value="tally_rect">Tally (Rectangular)</option>
+        <option value="tally_leaf">Tally (Leaf-shaped)</option>
+        <option value="plait">Plait</option>
+        <option value="leaf">Leaf</option>
+    </param>
+
+    <separator/>
+
+    <label appearance="header">Tape Settings</label>
+    <param name="tape_pairs" type="int" min="2" max="20" gui-text="Initial pairs:">8</param>
+    <param name="tape_width" type="float" min="1.0" max="50.0" precision="1" gui-text="Base width (mm):">10.0</param>
+
+    <separator/>
+
+    <label appearance="header">Plait Settings</label>
+    <param name="plait_picots" type="bool" gui-text="Add picots">false</param>
+
+    <separator/>
+
+    <label appearance="header">General Settings</label>
+    <param name="thread_size" type="int" min="20" max="200" gui-text="Thread size (higher = finer):">60</param>
+    <param name="show_control_path" type="bool" gui-text="Show control path">true</param>
+    <param name="snap_distance" type="float" min="1.0" max="20.0" precision="1" gui-text="Snap distance (mm):">5.0</param>
+
+    <effect>
+        <object-type>path</object-type>
+        <effects-menu>
+            <submenu name="Textile Arts"/>
+        </effects-menu>
+    </effect>
+
+    <script>
+        <command location="inx" interpreter="python">bedfordshire_lace.py</command>
+    </script>
+</inkscape-extension>
