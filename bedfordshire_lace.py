@@ -677,9 +677,6 @@ class BedfordshireLace(inkex.EffectExtension):
             signed_area += path_vertices[i][0] * path_vertices[j][1]
             signed_area -= path_vertices[j][0] * path_vertices[i][1]
 
-        # Debug: show the actual signed area
-        inkex.utils.debug(f"DEBUG: Signed area = {signed_area:.2f}")
-
         # In SVG coordinate system (y increases downward):
         # The standard interpretation is FLIPPED from mathematical convention
         # Positive signed area = clockwise winding in SVG
@@ -910,11 +907,6 @@ class BedfordshireLace(inkex.EffectExtension):
         path_winding = self.determine_path_winding(path_vertices)
         winding_name = "CW" if path_winding == -1 else "CCW"
 
-        # Debug: Log vertex detection
-        vertex_count = sum(1 for info in sample_info if info['is_vertex'])
-        if vertex_count > 0:
-            inkex.utils.debug(f"DEBUG: Found {vertex_count} vertices in samples, {len(path_vertices)} path vertices, winding: {winding_name}")
-
         for i, info in enumerate(sample_info):
             if info['is_vertex']:
                 # Find prev and next path vertices for angle calculation
@@ -941,12 +933,6 @@ class BedfordshireLace(inkex.EffectExtension):
                     # Determine if this is an exterior or interior corner
                     is_exterior = self.is_exterior_corner(prev_vertex, curr_vertex, next_vertex, path_winding)
 
-                    # Debug: show cross product calculation
-                    v1 = (curr_vertex[0] - prev_vertex[0], curr_vertex[1] - prev_vertex[1])
-                    v2 = (next_vertex[0] - curr_vertex[0], next_vertex[1] - curr_vertex[1])
-                    cross = v1[0] * v2[1] - v1[1] * v2[0]
-                    inkex.utils.debug(f"DEBUG:   Vertex {vertex_idx}: pos=({curr_vertex[0]:.1f},{curr_vertex[1]:.1f}), cross={cross:.2f}, is_exterior={is_exterior}")
-
                     # Determine which edge is the "outer" edge by checking which is farther from center
                     # Calculate path centroid
                     centroid_x = sum(v[0] for v in path_vertices) / len(path_vertices)
@@ -966,8 +952,6 @@ class BedfordshireLace(inkex.EffectExtension):
                     else:
                         edge_for_pricking = 'right'
 
-                    inkex.utils.debug(f"DEBUG:   distances: left={dist_left:.2f}, right={dist_right:.2f}, chose={edge_for_pricking}")
-
                     # Calculate angle bisector pricking position
                     # For exterior corners: bisector points outward (away from shape interior)
                     # For interior corners: bisector points inward (into the notch)
@@ -984,9 +968,6 @@ class BedfordshireLace(inkex.EffectExtension):
                         'is_exterior': is_exterior,
                         't': info['t']
                     })
-
-                    # Debug
-                    inkex.utils.debug(f"DEBUG: Vertex {vertex_idx} at sample {idx}, pricking at {pricking_pos}, {'exterior' if is_exterior else 'interior'}")
 
         # Reconstruct edges to pass through angle bisector pricking points
         # For vertices: replace the perpendicular offset with angle bisector position
@@ -1069,9 +1050,6 @@ class BedfordshireLace(inkex.EffectExtension):
 
         # Add all vertex prickings
         pricking_points.extend(deduplicated_vertices)
-
-        # Debug: Report final counts
-        inkex.utils.debug(f"DEBUG: Total pricking points: {len(pricking_points)} (including {len(deduplicated_vertices)} vertex prickings)")
 
         # For closed paths, add first point at end to complete the loop
         if is_closed:

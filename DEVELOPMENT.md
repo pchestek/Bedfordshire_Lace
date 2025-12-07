@@ -53,15 +53,9 @@ This Inkscape extension generates pricking patterns (pin placement diagrams) for
   - When using angle bisectors for pricking positions, edges cross the tape interior
   - When using miter points for pricking positions, they're not at the correct geometric angles
 
-  **Next Steps (Option 3 - Complex Solution)**:
-  1. Calculate pricking positions using angle bisectors (this part works)
-  2. **Reconstruct edges** to pass through these angle-bisector pricking points:
-     - Between vertices: use normal offset curves
-     - At vertices: create edge segments that connect to the pricking point
-     - May need to calculate where offset curves should "bend" to reach the pricking point
-     - This is NOT simple offsetting - requires custom curve construction
-  3. Ensure no edge crossing or gaps
-  4. Test with various corner angles (90°, acute, obtuse)
+  **Option 3 Status**: ATTEMPTED in Session 2 (see "Session 2: Tape Corner Angle Bisector Implementation" above)
+  - Angle bisector pricking positions: ✅ WORKING
+  - Edge reconstruction: ⚠️ PARTIAL - Creates artifacts, needs complete rewrite for smooth curves
 
   **Alternative Approaches Tried**:
   - ❌ Placing pricking on one edge only → causes edge crossing
@@ -317,19 +311,77 @@ All lace elements store JSON metadata in `data-lace-metadata` attribute:
 
 ## Recent Fixes (2025-12-07)
 
-### Rotated Rectangle Tally (Issue #1)
+### Session 1: Basic Element Testing
+
+#### Rotated Rectangle Tally (Issue #1)
 **Problem**: Tally rectangle appeared not to work on rotated rectangles
 **Root Cause**: User error - rotated rectangle was not properly selected during testing
 **Fix**: Added defensive check for rectangle tag anyway: `if not is_rect and control_path.tag.endswith('rect')`
 **Location**: `create_tally_rect()` lines 1003-1008
 **Status**: ✓ VERIFIED WORKING - Transform handling was correct all along. Additional check added as defense-in-depth.
 
-### Plait Error Message (Issue #2)
+#### Plait Error Message (Issue #2)
 **Problem**: Error message "object needs to be converted to a path" appears even when plait renders correctly
 **Root Cause**: User likely has multiple elements selected, including non-path elements. Extension processes all selected elements, shows error for non-paths but continues with valid paths.
 **Fix**: Improved error message to clarify which element is being skipped and why
 **Location**: `effect()` line 93
 **Status**: Improved messaging (not a bug, working as designed)
+
+### Session 2: Tape Corner Angle Bisector Implementation
+
+#### Angle Bisector Pricking Positions (Option 3 - Partial Implementation)
+**Goal**: Place vertex prickings at geometric angle bisectors as required by traditional bobbin lace
+**Status**: ⚠️ PARTIALLY WORKING - Prickings appear at correct positions, but edges need refinement
+
+**What Works**:
+- ✅ `determine_path_winding()`: Detects CW/CCW path winding using shoelace formula
+- ✅ `is_exterior_corner()`: Correctly identifies exterior vs interior corners using cross product
+- ✅ `calculate_vertex_pricking_position()`: Calculates angle bisector positions with correct distance (`half_width / sin(angle/2)`)
+- ✅ Centroid-based outer edge detection: Determines which edge (left/right) is farther from path center
+- ✅ All 5 vertex prickings appear on house-shaped test path
+- ✅ Prickings positioned at geometrically correct angle bisectors
+
+**What Doesn't Work**:
+- ❌ Edge reconstruction is oversimplified: Simple point replacement creates jagged edges
+- ❌ Sharp triangular artifacts at some corners
+- ❌ Edges are wavy/irregular due to dense sampling and point replacement
+- ❌ Need smooth curve reconstruction, not just point substitution
+
+**Technical Details**:
+- **Lines 657-690**: `determine_path_winding()` - Uses shoelace formula to detect CW (-1) or CCW (1) winding
+- **Lines 691-720**: `is_exterior_corner()` - Uses cross product; in SVG coords (Y-down): negative = exterior, positive = interior
+- **Lines 722-774**: `calculate_vertex_pricking_position()` - Calculates position along angle bisector at distance `half_width / sin(half_angle)`
+- **Lines 936-970**: Centroid-based edge selection - Measures distance from centroid to choose outer edge
+- **Lines 972-994**: Edge reconstruction - **NEEDS COMPLETE REWRITE** for smooth results
+
+**Current Edge Reconstruction Approach** (Simplified, causes artifacts):
+```python
+# For each vertex: replace offset point with angle bisector position
+if vertex_pricking:
+    if vertex_pricking['edge'] == 'left':
+        left_edge_display.append(vertex_pricking['pricking_pos'])
+    else:
+        right_edge_display.append(vertex_pricking['pricking_pos'])
+```
+
+**Required for Full Solution** (Not Yet Implemented):
+1. Smooth curve reconstruction around vertices
+2. Proper tangent matching between segments
+3. Possibly reduce sampling density
+4. Handle edge curves properly, not just polylines
+5. May need to use Bezier curves instead of polylines for edges
+
+**User Requirements Verified**:
+- Top peak: Pricking at angle bisector on outer edge ✅
+- Bottom 90° corners: Prickings at 45° on outer edges ✅
+- Inside corners: Prickings at angle bisectors on outer edges ✅
+- Edges pass through prickings: ⚠️ Technically yes, but creates artifacts
+
+**Next Steps** (Deferred):
+- Complete rewrite of edge reconstruction for smooth curves
+- Consider using Bezier path commands instead of polyline points
+- Test with various corner angles and path shapes
+- User education: Understanding how pricking relates to actual lace-making technique may inform better edge reconstruction approach
 
 ## Known Limitations
 
