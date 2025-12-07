@@ -867,6 +867,11 @@ class BedfordshireLace(inkex.EffectExtension):
         # First, identify vertices and calculate their pricking positions
         vertex_info = []  # Store vertex pricking information
 
+        # Debug: Log vertex detection
+        vertex_count = sum(1 for info in sample_info if info['is_vertex'])
+        if vertex_count > 0:
+            inkex.utils.debug(f"DEBUG: Found {vertex_count} vertices in samples, {len(path_vertices)} path vertices")
+
         for i, info in enumerate(sample_info):
             if info['is_vertex']:
                 # Find prev and next path vertices for angle calculation
@@ -876,7 +881,8 @@ class BedfordshireLace(inkex.EffectExtension):
                 vertex_idx = -1
                 for vi, v in enumerate(path_vertices):
                     # Check if this vertex matches our sample point
-                    if math.hypot(v[0] - info['center'][0], v[1] - info['center'][1]) < 0.01:
+                    dist = math.hypot(v[0] - info['center'][0], v[1] - info['center'][1])
+                    if dist < 0.1:  # Increased tolerance from 0.01 to 0.1
                         vertex_idx = vi
                         break
 
@@ -912,6 +918,9 @@ class BedfordshireLace(inkex.EffectExtension):
                         'is_exterior': is_exterior,
                         't': info['t']
                     })
+
+                    # Debug
+                    inkex.utils.debug(f"DEBUG: Vertex {vertex_idx} at sample {idx}, pricking at {pricking_pos}, {'exterior' if is_exterior else 'interior'}")
 
         # Reconstruct edges to pass through angle bisector pricking points
         # For vertices: replace the perpendicular offset with angle bisector position
@@ -994,6 +1003,9 @@ class BedfordshireLace(inkex.EffectExtension):
 
         # Add all vertex prickings
         pricking_points.extend(deduplicated_vertices)
+
+        # Debug: Report final counts
+        inkex.utils.debug(f"DEBUG: Total pricking points: {len(pricking_points)} (including {len(deduplicated_vertices)} vertex prickings)")
 
         # For closed paths, add first point at end to complete the loop
         if is_closed:
