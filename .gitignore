@@ -1,0 +1,16 @@
+# LibreOffice/OpenOffice lock files
+.~lock.*#
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Inkscape temporary files
+*~
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

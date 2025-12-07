@@ -75,7 +75,7 @@ class BedfordshireLace(inkex.EffectExtension):
             if element_type == "tape":
                 # Tape requires a path
                 if not isinstance(element, PathElement):
-                    inkex.errormsg(f"Tape requires a path object. Element '{element_id}' is not a path. Please use the Bezier/pen tool or convert your shape to a path (Path > Object to Path).")
+                    inkex.errormsg(f"Tape requires a path object. Element '{element_id}' (type: {element.tag}) is not a path. Skipping this element. Please use the Bezier/pen tool or convert your shape to a path (Path > Object to Path).")
                     continue
                 self.create_tape(element, lace_layer)
 
@@ -90,7 +90,7 @@ class BedfordshireLace(inkex.EffectExtension):
             elif element_type == "plait":
                 # Plait requires a path
                 if not isinstance(element, PathElement):
-                    inkex.errormsg(f"Plait requires a path object. Element '{element_id}' is not a path. Please use the Bezier/pen tool or convert your shape to a path (Path > Object to Path).")
+                    inkex.errormsg(f"Plait requires a path object. Element '{element_id}' (type: {element.tag}) is not a path. Skipping this element. If this is not a path you intended to convert to a plait, please deselect it.")
                     continue
                 self.create_plait(element, lace_layer)
 
@@ -998,9 +998,16 @@ class BedfordshireLace(inkex.EffectExtension):
         from inkex import Rectangle as RectElement
 
         # Check if this is an actual Rectangle element (not a path)
+        # Also check for rectangle attributes in case the element has a transform
         use_transform = False
+        is_rect = isinstance(control_path, RectElement)
 
-        if isinstance(control_path, RectElement):
+        # Also check if element has rectangle attributes (x, y, width, height)
+        # even if it's not strictly a RectElement type
+        if not is_rect and control_path.tag.endswith('rect'):
+            is_rect = True
+
+        if is_rect:
             # Use original dimensions from the rectangle
             use_transform = True
             x = float(control_path.get('x') or '0')

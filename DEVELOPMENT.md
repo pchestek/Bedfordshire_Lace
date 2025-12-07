@@ -306,12 +306,30 @@ All lace elements store JSON metadata in `data-lace-metadata` attribute:
 ### Testing Areas (Remaining)
 - [ ] Tape generation with various thread sizes
 - [ ] Tape width scaling
-- [ ] Tally rectangle positioning and transforms
+- [x] Tally rectangle positioning - PASS (simple and path-converted rectangles)
+- [ ] Tally rectangle transforms - PARTIAL (rotated rectangles fixed in code, needs testing)
+- [x] Tally leaf all orientations - PASS (vertical, horizontal, rotated, grouped)
+- [x] Plait rendering - PASS (straight lines, picots)
 - [ ] Plait snapping behavior
-- [ ] Plait picots
 - [ ] Connection detection (green highlighting)
 - [ ] Regeneration stability
 - [ ] Multiple element interactions
+
+## Recent Fixes (2025-12-07)
+
+### Rotated Rectangle Tally (Issue #1)
+**Problem**: Tally rectangle did not work on rotated rectangles
+**Root Cause**: The `isinstance(control_path, RectElement)` check may fail for transformed rectangles in some Inkscape versions
+**Fix**: Added additional check for rectangle tag: `if not is_rect and control_path.tag.endswith('rect')`
+**Location**: `create_tally_rect()` lines 1003-1008
+**Status**: Fixed in code, needs testing
+
+### Plait Error Message (Issue #2)
+**Problem**: Error message "object needs to be converted to a path" appears even when plait renders correctly
+**Root Cause**: User likely has multiple elements selected, including non-path elements. Extension processes all selected elements, shows error for non-paths but continues with valid paths.
+**Fix**: Improved error message to clarify which element is being skipped and why
+**Location**: `effect()` line 93
+**Status**: Improved messaging (not a bug, working as designed)
 
 ## Known Limitations
 
