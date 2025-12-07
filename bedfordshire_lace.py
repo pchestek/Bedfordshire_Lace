@@ -677,11 +677,16 @@ class BedfordshireLace(inkex.EffectExtension):
             signed_area += path_vertices[i][0] * path_vertices[j][1]
             signed_area -= path_vertices[j][0] * path_vertices[i][1]
 
+        # Debug: show the actual signed area
+        inkex.utils.debug(f"DEBUG: Signed area = {signed_area:.2f}")
+
         # In SVG coordinate system (y increases downward):
-        # Positive signed area = clockwise winding
-        # Negative signed area = counter-clockwise winding
-        # Return 1 for CCW, -1 for CW
-        return 1 if signed_area < 0 else -1
+        # The standard interpretation is FLIPPED from mathematical convention
+        # Positive signed area = clockwise winding in SVG
+        # Negative signed area = counter-clockwise winding in SVG
+        # BUT we need to determine which edge is "outer"
+        # For now, just return based on sign and we'll adjust edge selection
+        return -1 if signed_area > 0 else 1
 
     def is_exterior_corner(self, prev_point, vertex, next_point, path_winding):
         """
@@ -942,13 +947,26 @@ class BedfordshireLace(inkex.EffectExtension):
                     cross = v1[0] * v2[1] - v1[1] * v2[0]
                     inkex.utils.debug(f"DEBUG:   Vertex {vertex_idx}: cross={cross:.2f}, is_exterior={is_exterior}")
 
-                    # ALL prickings go on the outer edge of the tape
-                    # For CCW paths: left offset is outer edge
-                    # For CW paths: right offset is outer edge
-                    if path_winding == 1:  # CCW
+                    # Determine which edge is the "outer" edge by checking which is farther from center
+                    # Calculate path centroid
+                    centroid_x = sum(v[0] for v in path_vertices) / len(path_vertices)
+                    centroid_y = sum(v[1] for v in path_vertices) / len(path_vertices)
+
+                    # For exterior corners, the outer edge point should be farther from centroid
+                    # Get the left and right offset points at this vertex
+                    left_offset = info['left']
+                    right_offset = info['right']
+
+                    dist_left = math.hypot(left_offset[0] - centroid_x, left_offset[1] - centroid_y)
+                    dist_right = math.hypot(right_offset[0] - centroid_x, right_offset[1] - centroid_y)
+
+                    # The outer edge is the one farther from the centroid
+                    if dist_left > dist_right:
                         edge_for_pricking = 'left'
-                    else:  # CW
+                    else:
                         edge_for_pricking = 'right'
+
+                    inkex.utils.debug(f"DEBUG:   distances: left={dist_left:.2f}, right={dist_right:.2f}, chose={edge_for_pricking}")
 
                     # Calculate angle bisector pricking position
                     # For exterior corners: bisector points outward (away from shape interior)
