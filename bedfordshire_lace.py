@@ -654,6 +654,93 @@ class BedfordshireLace(inkex.EffectExtension):
 
         return bisector
 
+    def is_exterior_corner(self, prev_point, vertex, next_point):
+        """
+        Determine if a corner is exterior (convex) or interior (concave).
+
+        Uses the cross product to determine the turning direction.
+        For a clockwise-wound closed path, left turns are exterior corners.
+
+        Args:
+            prev_point: Point before the vertex
+            vertex: The vertex point
+            next_point: Point after the vertex
+
+        Returns:
+            True if exterior corner, False if interior corner
+        """
+        # Vectors
+        v1 = (vertex[0] - prev_point[0], vertex[1] - prev_point[1])
+        v2 = (next_point[0] - vertex[0], next_point[1] - vertex[1])
+
+        # Cross product (z-component)
+        cross = v1[0] * v2[1] - v1[1] * v2[0]
+
+        # Positive cross product = left turn = exterior (for counter-clockwise paths)
+        # SVG typically uses counter-clockwise winding for positive areas
+        return cross > 0
+
+    def calculate_vertex_pricking_position(self, prev_point, vertex, next_point, half_width, is_exterior):
+        """
+        Calculate the pricking point position at a vertex using angle bisector geometry.
+
+        For bobbin lace, pricking points at corners must be positioned along the angle bisector
+        of the corner. The distance along the bisector depends on the corner angle.
+
+        Args:
+            prev_point: Point before the vertex
+            vertex: The vertex point
+            next_point: Point after the vertex
+            half_width: Half the tape width
+            is_exterior: True if this is an exterior corner (outside edge), False for interior
+
+        Returns:
+            (x, y) tuple of the pricking point position
+        """
+        # Get interior bisector direction
+        interior_bisector = self.calculate_angle_bisector(prev_point, vertex, next_point)
+
+        # For exterior corners, negate the bisector
+        if is_exterior:
+            bisector = (-interior_bisector[0], -interior_bisector[1])
+        else:
+            bisector = interior_bisector
+
+        # Calculate the angle between the two edges
+        v1 = (prev_point[0] - vertex[0], prev_point[1] - vertex[1])
+        v2 = (next_point[0] - vertex[0], next_point[1] - vertex[1])
+
+        v1_len = math.hypot(v1[0], v1[1])
+        v2_len = math.hypot(v2[0], v2[1])
+
+        if v1_len > 0 and v2_len > 0:
+            v1_norm = (v1[0] / v1_len, v1[1] / v1_len)
+            v2_norm = (v2[0] / v2_len, v2[1] / v2_len)
+
+            # Dot product gives cos(angle)
+            dot_product = v1_norm[0] * v2_norm[0] + v1_norm[1] * v2_norm[1]
+            # Clamp to [-1, 1] to handle floating point errors
+            dot_product = max(-1.0, min(1.0, dot_product))
+
+            angle_rad = math.acos(dot_product)
+            half_angle = angle_rad / 2
+
+            # Distance along bisector = half_width / sin(half_angle)
+            # For very small angles, use a minimum to avoid infinity
+            if abs(math.sin(half_angle)) > 0.01:
+                distance = half_width / math.sin(half_angle)
+            else:
+                distance = half_width * 10  # Cap at reasonable value
+        else:
+            # Degenerate case - use half_width
+            distance = half_width
+
+        # Position pricking along bisector
+        pricking_x = vertex[0] + bisector[0] * distance
+        pricking_y = vertex[1] + bisector[1] * distance
+
+        return (pricking_x, pricking_y)
+
     def miter_offset_edges(self, edge_points):
         """
         Fix self-intersecting offset curves by detecting sharp turns.
@@ -774,11 +861,87 @@ class BedfordshireLace(inkex.EffectExtension):
 
             alternating = not alternating
 
-        # Miter the offset edges to remove self-intersections
-        left_edge_display, left_miters = self.miter_offset_edges(left_edge_raw[:])
-        right_edge_display, right_miters = self.miter_offset_edges(right_edge_raw[:])
+        # NEW APPROACH: Calculate angle bisector pricking positions for vertices
+        # and reconstruct edges to pass through them
 
-        # Build pricking points - use miter points for vertices
+        # First, identify vertices and calculate their pricking positions
+        vertex_info = []  # Store vertex pricking information
+
+        for i, info in enumerate(sample_info):
+            if info['is_vertex']:
+                # Find prev and next path vertices for angle calculation
+                idx = info['index']
+
+                # Find indices in path_vertices
+                vertex_idx = -1
+                for vi, v in enumerate(path_vertices):
+                    # Check if this vertex matches our sample point
+                    if math.hypot(v[0] - info['center'][0], v[1] - info['center'][1]) < 0.01:
+                        vertex_idx = vi
+                        break
+
+                if vertex_idx >= 0 and len(path_vertices) >= 3:
+                    # Get prev and next vertices (with wraparound for closed paths)
+                    prev_v_idx = (vertex_idx - 1) % len(path_vertices)
+                    next_v_idx = (vertex_idx + 1) % len(path_vertices)
+
+                    prev_vertex = path_vertices[prev_v_idx]
+                    curr_vertex = path_vertices[vertex_idx]
+                    next_vertex = path_vertices[next_v_idx]
+
+                    # Determine if this is an exterior or interior corner
+                    is_exterior = self.is_exterior_corner(prev_vertex, curr_vertex, next_vertex)
+
+                    # Calculate angle bisector pricking position
+                    pricking_pos = self.calculate_vertex_pricking_position(
+                        prev_vertex, curr_vertex, next_vertex, half_width, is_exterior
+                    )
+
+                    # Determine which edge the pricking should be on
+                    # For exterior corners, pricking is on the outer edge
+                    # The "outer edge" is the one pointing away from the interior
+                    edge_for_pricking = info['edge_for_pricking']
+
+                    vertex_info.append({
+                        'sample_idx': idx,
+                        'vertex_idx': vertex_idx,
+                        'pricking_pos': pricking_pos,
+                        'edge': edge_for_pricking,
+                        'is_exterior': is_exterior,
+                        't': info['t']
+                    })
+
+        # Reconstruct edges to pass through angle bisector pricking points
+        # Strategy: Replace the offset point at each vertex with the angle bisector position
+        left_edge_reconstructed = []
+        right_edge_reconstructed = []
+
+        for i, info in enumerate(sample_info):
+            # Check if this sample is a vertex with a pricking
+            vertex_pricking = None
+            for v_info in vertex_info:
+                if v_info['sample_idx'] == info['index']:
+                    vertex_pricking = v_info
+                    break
+
+            if vertex_pricking:
+                # Use the angle bisector pricking position for the appropriate edge
+                if vertex_pricking['edge'] == 'left':
+                    left_edge_reconstructed.append(vertex_pricking['pricking_pos'])
+                    right_edge_reconstructed.append(info['right'])
+                else:
+                    left_edge_reconstructed.append(info['left'])
+                    right_edge_reconstructed.append(vertex_pricking['pricking_pos'])
+            else:
+                # Regular sample - use normal offsets
+                left_edge_reconstructed.append(info['left'])
+                right_edge_reconstructed.append(info['right'])
+
+        # Use reconstructed edges for display
+        left_edge_display = left_edge_reconstructed
+        right_edge_display = right_edge_reconstructed
+
+        # Build pricking points
         pricking_points = []
         vertex_prickings = []
 
@@ -787,50 +950,24 @@ class BedfordshireLace(inkex.EffectExtension):
             edge = info['edge_for_pricking']
             is_vertex = info['is_vertex']
 
-            if is_vertex:
-                # Check both edges for miters at this vertex
-                left_miter_point = None
-                right_miter_point = None
+            # Check if this is a vertex with angle bisector pricking
+            vertex_pricking = None
+            for v_info in vertex_info:
+                if v_info['sample_idx'] == idx:
+                    vertex_pricking = v_info
+                    break
 
-                for miter in left_miters:
-                    if miter['start_idx'] <= idx <= miter['end_idx']:
-                        left_miter_point = miter['point']
-                        break
-
-                for miter in right_miters:
-                    if miter['start_idx'] <= idx <= miter['end_idx']:
-                        right_miter_point = miter['point']
-                        break
-
-                # Use the miter point from whichever edge it should be on
-                if left_miter_point and right_miter_point:
-                    # Both mitered - use alternating pattern
-                    if edge == 'left':
-                        pricking_point = left_miter_point
-                        actual_edge = 'left'
-                    else:
-                        pricking_point = right_miter_point
-                        actual_edge = 'right'
-                elif left_miter_point:
-                    pricking_point = left_miter_point
-                    actual_edge = 'left'
-                elif right_miter_point:
-                    pricking_point = right_miter_point
-                    actual_edge = 'right'
-                else:
-                    # No miters - use raw offset
-                    pricking_point = info['left'] if edge == 'left' else info['right']
-                    actual_edge = edge
-
+            if vertex_pricking:
+                # Use angle bisector pricking position
                 vertex_prickings.append({
-                    'point': pricking_point,
-                    'edge': actual_edge,
-                    't': info['t'],
+                    'point': vertex_pricking['pricking_pos'],
+                    'edge': vertex_pricking['edge'],
+                    't': vertex_pricking['t'],
                     'index': idx,
                     'is_active': False,
                     'is_vertex': True
                 })
-            else:
+            elif not is_vertex:
                 # Regular pricking point (not at a vertex)
                 pricking_point = info['left'] if edge == 'left' else info['right']
                 pricking_points.append({
