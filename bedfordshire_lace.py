@@ -914,34 +914,31 @@ class BedfordshireLace(inkex.EffectExtension):
                     })
 
         # Reconstruct edges to pass through angle bisector pricking points
-        # Strategy: Replace the offset point at each vertex with the angle bisector position
-        left_edge_reconstructed = []
-        right_edge_reconstructed = []
+        # For vertices: replace the perpendicular offset with angle bisector position
+        # Don't miter - accept the geometry as-is
+
+        left_edge_display = []
+        right_edge_display = []
 
         for i, info in enumerate(sample_info):
-            # Check if this sample is a vertex with a pricking
+            idx = info['index']
+
+            # Check if this is a vertex with a pricking
             vertex_pricking = None
             for v_info in vertex_info:
-                if v_info['sample_idx'] == info['index']:
+                if v_info['sample_idx'] == idx:
                     vertex_pricking = v_info
                     break
 
             if vertex_pricking:
-                # Use the angle bisector pricking position for the appropriate edge
-                if vertex_pricking['edge'] == 'left':
-                    left_edge_reconstructed.append(vertex_pricking['pricking_pos'])
-                    right_edge_reconstructed.append(info['right'])
-                else:
-                    left_edge_reconstructed.append(info['left'])
-                    right_edge_reconstructed.append(vertex_pricking['pricking_pos'])
+                # Use the angle bisector pricking position for the left (outer) edge
+                left_edge_display.append(vertex_pricking['pricking_pos'])
+                # Use normal offset for right (inner) edge
+                right_edge_display.append(info['right'])
             else:
                 # Regular sample - use normal offsets
-                left_edge_reconstructed.append(info['left'])
-                right_edge_reconstructed.append(info['right'])
-
-        # Use reconstructed edges for display
-        left_edge_display = left_edge_reconstructed
-        right_edge_display = right_edge_reconstructed
+                left_edge_display.append(info['left'])
+                right_edge_display.append(info['right'])
 
         # Build pricking points
         pricking_points = []
