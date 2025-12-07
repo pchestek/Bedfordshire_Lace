@@ -659,7 +659,6 @@ class BedfordshireLace(inkex.EffectExtension):
         Determine if a corner is exterior (convex) or interior (concave).
 
         Uses the cross product to determine the turning direction.
-        For a clockwise-wound closed path, left turns are exterior corners.
 
         Args:
             prev_point: Point before the vertex
@@ -676,9 +675,11 @@ class BedfordshireLace(inkex.EffectExtension):
         # Cross product (z-component)
         cross = v1[0] * v2[1] - v1[1] * v2[0]
 
-        # Positive cross product = left turn = exterior (for counter-clockwise paths)
-        # SVG typically uses counter-clockwise winding for positive areas
-        return cross > 0
+        # For clockwise-wound paths (common when drawing shapes):
+        # Negative cross product = left turn = exterior corner
+        # Positive cross product = right turn = interior corner
+        # Flip the sign compared to standard CCW convention
+        return cross < 0
 
     def calculate_vertex_pricking_position(self, prev_point, vertex, next_point, half_width, is_exterior):
         """
