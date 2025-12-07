@@ -654,7 +654,35 @@ class BedfordshireLace(inkex.EffectExtension):
 
         return bisector
 
-    def is_exterior_corner(self, prev_point, vertex, next_point):
+    def determine_path_winding(self, path_vertices):
+        """
+        Determine if a closed path is wound clockwise or counter-clockwise.
+
+        Uses the shoelace formula to calculate the signed area.
+        Positive area = counter-clockwise, Negative area = clockwise
+
+        Args:
+            path_vertices: List of (x, y) vertex points
+
+        Returns:
+            1 if counter-clockwise, -1 if clockwise
+        """
+        if len(path_vertices) < 3:
+            return 1  # Default to CCW
+
+        # Shoelace formula for signed area
+        signed_area = 0
+        for i in range(len(path_vertices)):
+            j = (i + 1) % len(path_vertices)
+            signed_area += path_vertices[i][0] * path_vertices[j][1]
+            signed_area -= path_vertices[j][0] * path_vertices[i][1]
+
+        # In SVG coordinate system (y increases downward):
+        # Positive area = clockwise, Negative area = counter-clockwise
+        # So we flip the sign
+        return -1 if signed_area > 0 else 1
+
+    def is_exterior_corner(self, prev_point, vertex, next_point, path_winding):
         """
         Determine if a corner is exterior (convex) or interior (concave).
 
@@ -664,6 +692,7 @@ class BedfordshireLace(inkex.EffectExtension):
             prev_point: Point before the vertex
             vertex: The vertex point
             next_point: Point after the vertex
+            path_winding: 1 for CCW, -1 for CW (from determine_path_winding)
 
         Returns:
             True if exterior corner, False if interior corner
@@ -675,11 +704,13 @@ class BedfordshireLace(inkex.EffectExtension):
         # Cross product (z-component)
         cross = v1[0] * v2[1] - v1[1] * v2[0]
 
-        # For clockwise-wound paths (common when drawing shapes):
-        # Negative cross product = left turn = exterior corner
-        # Positive cross product = right turn = interior corner
-        # Flip the sign compared to standard CCW convention
-        return cross < 0
+        # Interpret cross product based on winding direction:
+        # For CCW (winding=1): positive cross = left turn = exterior
+        # For CW (winding=-1): negative cross = left turn = exterior
+        # Multiply cross by winding to normalize
+        normalized_cross = cross * path_winding
+
+        return normalized_cross > 0
 
     def calculate_vertex_pricking_position(self, prev_point, vertex, next_point, half_width, is_exterior):
         """
@@ -868,10 +899,14 @@ class BedfordshireLace(inkex.EffectExtension):
         # First, identify vertices and calculate their pricking positions
         vertex_info = []  # Store vertex pricking information
 
+        # Determine path winding direction (CW or CCW)
+        path_winding = self.determine_path_winding(path_vertices)
+        winding_name = "CW" if path_winding == -1 else "CCW"
+
         # Debug: Log vertex detection
         vertex_count = sum(1 for info in sample_info if info['is_vertex'])
         if vertex_count > 0:
-            inkex.utils.debug(f"DEBUG: Found {vertex_count} vertices in samples, {len(path_vertices)} path vertices")
+            inkex.utils.debug(f"DEBUG: Found {vertex_count} vertices in samples, {len(path_vertices)} path vertices, winding: {winding_name}")
 
         for i, info in enumerate(sample_info):
             if info['is_vertex']:
@@ -897,11 +932,15 @@ class BedfordshireLace(inkex.EffectExtension):
                     next_vertex = path_vertices[next_v_idx]
 
                     # Determine if this is an exterior or interior corner
-                    is_exterior = self.is_exterior_corner(prev_vertex, curr_vertex, next_vertex)
+                    is_exterior = self.is_exterior_corner(prev_vertex, curr_vertex, next_vertex, path_winding)
 
                     # ALL prickings go on the outer edge of the tape
-                    # For counter-clockwise wound paths, the left offset is the outer edge
-                    edge_for_pricking = 'left'
+                    # For CCW paths: left offset is outer edge
+                    # For CW paths: right offset is outer edge
+                    if path_winding == 1:  # CCW
+                        edge_for_pricking = 'left'
+                    else:  # CW
+                        edge_for_pricking = 'right'
 
                     # Calculate angle bisector pricking position
                     # For exterior corners: bisector points outward (away from shape interior)
