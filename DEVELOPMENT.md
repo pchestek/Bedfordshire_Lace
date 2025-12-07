@@ -307,7 +307,7 @@ All lace elements store JSON metadata in `data-lace-metadata` attribute:
 - [ ] Tape generation with various thread sizes
 - [ ] Tape width scaling
 - [x] Tally rectangle positioning - PASS (simple and path-converted rectangles)
-- [ ] Tally rectangle transforms - PARTIAL (rotated rectangles fixed in code, needs testing)
+- [x] Tally rectangle transforms - PASS (rotated rectangles work correctly)
 - [x] Tally leaf all orientations - PASS (vertical, horizontal, rotated, grouped)
 - [x] Plait rendering - PASS (straight lines, picots)
 - [ ] Plait snapping behavior
@@ -318,11 +318,11 @@ All lace elements store JSON metadata in `data-lace-metadata` attribute:
 ## Recent Fixes (2025-12-07)
 
 ### Rotated Rectangle Tally (Issue #1)
-**Problem**: Tally rectangle did not work on rotated rectangles
-**Root Cause**: The `isinstance(control_path, RectElement)` check may fail for transformed rectangles in some Inkscape versions
-**Fix**: Added additional check for rectangle tag: `if not is_rect and control_path.tag.endswith('rect')`
+**Problem**: Tally rectangle appeared not to work on rotated rectangles
+**Root Cause**: User error - rotated rectangle was not properly selected during testing
+**Fix**: Added defensive check for rectangle tag anyway: `if not is_rect and control_path.tag.endswith('rect')`
 **Location**: `create_tally_rect()` lines 1003-1008
-**Status**: Fixed in code, needs testing
+**Status**: ✓ VERIFIED WORKING - Transform handling was correct all along. Additional check added as defense-in-depth.
 
 ### Plait Error Message (Issue #2)
 **Problem**: Error message "object needs to be converted to a path" appears even when plait renders correctly
