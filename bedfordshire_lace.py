@@ -678,9 +678,10 @@ class BedfordshireLace(inkex.EffectExtension):
             signed_area -= path_vertices[j][0] * path_vertices[i][1]
 
         # In SVG coordinate system (y increases downward):
-        # Positive area = clockwise, Negative area = counter-clockwise
-        # So we flip the sign
-        return -1 if signed_area > 0 else 1
+        # Positive signed area = clockwise winding
+        # Negative signed area = counter-clockwise winding
+        # Return 1 for CCW, -1 for CW
+        return 1 if signed_area < 0 else -1
 
     def is_exterior_corner(self, prev_point, vertex, next_point, path_winding):
         """
@@ -704,13 +705,14 @@ class BedfordshireLace(inkex.EffectExtension):
         # Cross product (z-component)
         cross = v1[0] * v2[1] - v1[1] * v2[0]
 
-        # Interpret cross product based on winding direction:
-        # For CCW (winding=1): positive cross = left turn = exterior
-        # For CW (winding=-1): negative cross = left turn = exterior
-        # Multiply cross by winding to normalize
-        normalized_cross = cross * path_winding
+        # In SVG coordinates (Y-down), for a typical closed path:
+        # Negative cross = convex/exterior corner (turning outward)
+        # Positive cross = concave/interior corner (turning inward)
+        # This is independent of overall winding direction for determining convexity
 
-        return normalized_cross > 0
+        # Simply check sign of cross product
+        # Negative = exterior, Positive = interior
+        return cross < 0
 
     def calculate_vertex_pricking_position(self, prev_point, vertex, next_point, half_width, is_exterior):
         """
