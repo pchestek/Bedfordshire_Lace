@@ -934,6 +934,12 @@ class BedfordshireLace(inkex.EffectExtension):
                     # Determine if this is an exterior or interior corner
                     is_exterior = self.is_exterior_corner(prev_vertex, curr_vertex, next_vertex, path_winding)
 
+                    # Debug: show cross product calculation
+                    v1 = (curr_vertex[0] - prev_vertex[0], curr_vertex[1] - prev_vertex[1])
+                    v2 = (next_vertex[0] - curr_vertex[0], next_vertex[1] - curr_vertex[1])
+                    cross = v1[0] * v2[1] - v1[1] * v2[0]
+                    inkex.utils.debug(f"DEBUG:   Vertex {vertex_idx}: cross={cross:.2f}, is_exterior={is_exterior}")
+
                     # ALL prickings go on the outer edge of the tape
                     # For CCW paths: left offset is outer edge
                     # For CW paths: right offset is outer edge
