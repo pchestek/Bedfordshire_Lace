@@ -892,15 +892,17 @@ class BedfordshireLace(inkex.EffectExtension):
                     # Determine if this is an exterior or interior corner
                     is_exterior = self.is_exterior_corner(prev_vertex, curr_vertex, next_vertex)
 
+                    # ALL prickings go on the outer edge of the tape
+                    # For counter-clockwise wound paths, the left offset is the outer edge
+                    edge_for_pricking = 'left'
+
                     # Calculate angle bisector pricking position
+                    # For exterior corners: bisector points outward (away from shape interior)
+                    # For interior corners: bisector points inward (into the notch)
+                    # Both should position the pricking on the outer (left) edge
                     pricking_pos = self.calculate_vertex_pricking_position(
                         prev_vertex, curr_vertex, next_vertex, half_width, is_exterior
                     )
-
-                    # Determine which edge the pricking should be on
-                    # For exterior corners, pricking is on the outer edge
-                    # The "outer edge" is the one pointing away from the interior
-                    edge_for_pricking = info['edge_for_pricking']
 
                     vertex_info.append({
                         'sample_idx': idx,
